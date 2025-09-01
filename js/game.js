@@ -17,6 +17,18 @@ obstacleImg.src = 'images/obstacle.png';
 const solImg = new Image();
 solImg.src = 'images/sol.png';
 
+// S'assurer que toutes les images sont chargées avant de lancer le jeu
+let imagesLoaded = 0;
+function checkAllLoaded() {
+    imagesLoaded++;
+    if (imagesLoaded === 3) {
+        update();
+    }
+}
+playerImg.onload = checkAllLoaded;
+obstacleImg.onload = checkAllLoaded;
+solImg.onload = checkAllLoaded;
+
 // Player
 let player = {
     x: TILE_SIZE * 2,
@@ -29,7 +41,7 @@ let player = {
     jumpPower: 8,
     onGround: false,
     frame: 0,
-    maxFrames: 4 // pour sprite player.png
+    maxFrames: 4
 };
 
 // Niveaux
@@ -59,7 +71,7 @@ function drawLevel() {
         for (let x = 0; x < level[y].length; x++) {
             const tile = level[y][x];
             if (tile === 1) drawSprite(solImg, x * TILE_SIZE, y * TILE_SIZE);
-            else if (tile === 2) drawSprite(obstacleImg, x * TILE_SIZE, y * TILE_SIZE, 0, 0, 32, 32);
+            else if (tile === 2) drawSprite(obstacleImg, x * TILE_SIZE, y * TILE_SIZE);
         }
     }
 }
@@ -84,7 +96,7 @@ function update() {
     player.x += player.dx;
     player.y += player.dy;
 
-    // Collisions simples avec le sol
+    // Collisions avec le sol
     let row = Math.floor((player.y + player.height) / TILE_SIZE);
     if (row >= level.length) {
         resetPlayer();
@@ -112,12 +124,3 @@ function draw() {
     drawLevel();
     drawSprite(playerImg, player.x, player.y, player.frame, 0, player.width, player.height);
 }
-
-// Lancement du jeu
-playerImg.onload = () => {
-    obstacleImg.onload = () => {
-        solImg.onload = () => {
-            update();
-        };
-    };
-};
