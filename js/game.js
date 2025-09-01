@@ -6,8 +6,9 @@ canvas.height = 640;
 const ctx = canvas.getContext('2d');
 
 const TILE_SIZE = 32;
+const GRAVITY = 0.5;
 
-// Images
+// --- Images ---
 const playerImg = new Image();
 playerImg.src = 'images/player.png';
 
@@ -29,7 +30,7 @@ playerImg.onload = checkAllLoaded;
 obstacleImg.onload = checkAllLoaded;
 solImg.onload = checkAllLoaded;
 
-// Player
+// --- Joueur ---
 let player = {
     x: TILE_SIZE * 2,
     y: canvas.height - TILE_SIZE * 2,
@@ -44,20 +45,35 @@ let player = {
     maxFrames: 4
 };
 
-// Niveaux
+// --- Génération du niveau ---
+function generateLevel() {
+    const rows = 20;
+    const cols = 25;
+    const lvl = [];
+    for (let y = 0; y < rows; y++) {
+        lvl[y] = [];
+        for (let x = 0; x < cols; x++) {
+            if (y === rows - 1) lvl[y][x] = 1; // sol
+            else if (Math.random() < 0.05) lvl[y][x] = 2; // obstacle aléatoire
+            else lvl[y][x] = 0;
+        }
+    }
+    return lvl;
+}
+
 let level = generateLevel();
 
-// Touches
+// --- Touches ---
 const keys = {};
 document.addEventListener('keydown', e => keys[e.key] = true);
 document.addEventListener('keyup', e => keys[e.key] = false);
 
-// Dessine un sprite depuis une spritesheet
+// --- Dessine un sprite depuis une spritesheet ---
 function drawSprite(img, x, y, frameX = 0, frameY = 0, width = 32, height = 32) {
     ctx.drawImage(img, frameX * width, frameY * height, width, height, x, y, width, height);
 }
 
-// Reset joueur
+// --- Reset joueur ---
 function resetPlayer() {
     player.x = TILE_SIZE * 2;
     player.y = canvas.height - TILE_SIZE * 2;
@@ -65,7 +81,7 @@ function resetPlayer() {
     player.dy = 0;
 }
 
-// Dessin du niveau
+// --- Dessin du niveau ---
 function drawLevel() {
     for (let y = 0; y < level.length; y++) {
         for (let x = 0; x < level[y].length; x++) {
@@ -76,49 +92,81 @@ function drawLevel() {
     }
 }
 
-// Boucle du jeu
+// --- Boucle du jeu ---
 function update() {
-    // Mouvement horizontal
+    // --- Mouvement horizontal ---
     player.dx = 0;
     if (keys['ArrowLeft']) player.dx = -player.speed;
     if (keys['ArrowRight']) player.dx = player.speed;
 
-    // Saut
+    // --- Animation du joueur ---
+    if (player.dx !== 0) {
+        player.frame++;
+        if (player.frame >= player.maxFrames) player.frame = 0;
+    } else {
+        player.frame = 0;
+    }
+
+    // --- Saut ---
     if (keys['ArrowUp'] && player.onGround) {
         player.dy = -player.jumpPower;
         player.onGround = false;
     }
 
-    // Gravité
-    player.dy += 0.5;
+    // --- Gravité ---
+    player.dy += GRAVITY;
 
-    // Position
+    // --- Déplacement et collisions ---
+    // Déplacement horizontal
     player.x += player.dx;
+    handleCollisions('x');
+
+    // Déplacement vertical
     player.y += player.dy;
-
-    // Collisions avec le sol
-    let row = Math.floor((player.y + player.height) / TILE_SIZE);
-    if (row >= level.length) {
-        resetPlayer();
-        return;
-    }
-
-    if (level[row] && level[row][Math.floor(player.x / TILE_SIZE)] === 1) {
-        player.y = row * TILE_SIZE - player.height;
-        player.dy = 0;
-        player.onGround = true;
-    }
-
-    // Collisions obstacles
-    if (level[row] && level[row][Math.floor(player.x / TILE_SIZE)] === 2) {
-        resetPlayer();
-    }
+    handleCollisions('y');
 
     draw();
     requestAnimationFrame(update);
 }
 
-// Dessin
+// --- Gestion des collisions ---
+function handleCollisions(axis) {
+    const left = Math.floor(player.x / TILE_SIZE);
+    const right = Math.floor((player.x + player.width - 1) / TILE_SIZE);
+    const top = Math.floor(player.y / TILE_SIZE);
+    const bottom = Math.floor((player.y + player.height - 1) / TILE_SIZE);
+
+    for (let y = top; y <= bottom; y++) {
+        for (let x = left; x <= right; x++) {
+            if (!level[y] || !level[y][x]) continue;
+
+            const tile = level[y][x];
+
+            if (tile === 1) { // SOL
+                if (axis === 'y') {
+                    if (player.dy > 0) { // chute
+                        player.y = y * TILE_SIZE - player.height;
+                        player.dy = 0;
+                        player.onGround = true;
+                    } else if (player.dy < 0) { // plafond
+                        player.y = (y + 1) * TILE_SIZE;
+                        player.dy = 0;
+                    }
+                } else if (axis === 'x') {
+                    if (player.dx > 0) player.x = x * TILE_SIZE - player.width;
+                    else if (player.dx < 0) player.x = (x + 1) * TILE_SIZE;
+                }
+            } else if (tile === 2) { // OBSTACLE
+                resetPlayer();
+            }
+        }
+    }
+
+    // Si le joueur tombe en dehors du niveau
+    if (player.y > canvas.height) resetPlayer();
+}
+
+// --- Dessin ---
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawLevel();
