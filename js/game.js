@@ -1,5 +1,3 @@
-// game.js
-
 const canvas = document.getElementById('gameCanvas');
 canvas.width = 800;
 canvas.height = 640;
@@ -17,6 +15,15 @@ obstacleImg.src = 'images/obstacle.png';
 
 const solImg = new Image();
 solImg.src = 'images/sol.png';
+
+// --- Audio ---
+const bgMusic = new Audio('audio/background.mp3');
+bgMusic.loop = true;
+bgMusic.volume = 0.3;
+bgMusic.play();
+
+const jumpSound = new Audio('audio/jump.mp3');
+const deathSound = new Audio('audio/cridemort.mp3');
 
 // Vérifier que toutes les images sont chargées
 let imagesLoaded = 0;
@@ -90,6 +97,10 @@ document.addEventListener('keyup', e => keys[e.key] = false);
 
 // --- Reset joueur ---
 function resetPlayer() {
+    // Son de mort pendant 3 secondes
+    deathSound.play();
+    setTimeout(() => deathSound.pause(), 3000);
+
     player.x = TILE_SIZE * 2;
     player.y = canvas.height - TILE_SIZE * 2;
     player.dx = 0;
@@ -153,6 +164,7 @@ function update() {
     if (keys['ArrowUp'] && player.onGround) {
         player.dy = -player.jumpPower;
         player.onGround = false;
+        jumpSound.play(); // son du saut
     }
 
     player.dy += GRAVITY;
@@ -170,6 +182,5 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawLevel();
-    // Joueur fixe, pas de sprite
     ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
 }
