@@ -18,7 +18,7 @@ obstacleImg.src = 'images/obstacle.png';
 const solImg = new Image();
 solImg.src = 'images/sol.png';
 
-// S'assurer que toutes les images sont chargées avant de lancer le jeu
+// Vérifier que toutes les images sont chargées
 let imagesLoaded = 0;
 function checkAllLoaded() {
     imagesLoaded++;
@@ -40,25 +40,45 @@ let player = {
     dy: 0,
     speed: 3,
     jumpPower: 8,
-    onGround: false,
-    frame: 0,
-    maxFrames: 4
+    onGround: false
 };
 
 // --- Génération du niveau ---
 function generateLevel() {
-    const rows = 20;
-    const cols = 25;
-    const lvl = [];
-    for (let y = 0; y < rows; y++) {
-        lvl[y] = [];
-        for (let x = 0; x < cols; x++) {
-            if (y === rows - 1) lvl[y][x] = 1; // sol
-            else if (Math.random() < 0.05) lvl[y][x] = 2; // obstacle aléatoire
-            else lvl[y][x] = 0;
+    const ROWS = 20;
+    const COLS = 25;
+    const level = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+
+    // Sol
+    for (let x = 0; x < COLS; x++) level[ROWS - 1][x] = 1;
+
+    let prevY = ROWS - 1;
+    let prevX = 0;
+
+    while (prevX < COLS - 2) {
+        let platformLength = Math.floor(Math.random() * 5) + 3;
+        let gap = Math.floor(Math.random() * 4) + 1;
+        let newX = prevX + gap;
+        if (newX + platformLength >= COLS) break;
+
+        let deltaY = Math.floor(Math.random() * 3) - 1;
+        let newY = Math.max(2, Math.min(ROWS - 2, prevY + deltaY));
+
+        for (let x = newX; x < newX + platformLength; x++) {
+            level[newY][x] = 1;
         }
+
+        // Obstacle aléatoire
+        if (Math.random() < 0.3) {
+            let obsX = newX + Math.floor(Math.random() * platformLength);
+            level[newY - 1][obsX] = 2;
+        }
+
+        prevX = newX + platformLength;
+        prevY = newY;
     }
-    return lvl;
+
+    return level;
 }
 
 let level = generateLevel();
@@ -68,17 +88,13 @@ const keys = {};
 document.addEventListener('keydown', e => keys[e.key] = true);
 document.addEventListener('keyup', e => keys[e.key] = false);
 
-// --- Dessine un sprite depuis une spritesheet ---
-function drawSprite(img, x, y, frameX = 0, frameY = 0, width = 32, height = 32) {
-    ctx.drawImage(img, frameX * width, frameY * height, width, height, x, y, width, height);
-}
-
 // --- Reset joueur ---
 function resetPlayer() {
     player.x = TILE_SIZE * 2;
     player.y = canvas.height - TILE_SIZE * 2;
     player.dx = 0;
     player.dy = 0;
+    player.onGround = false;
 }
 
 // --- Dessin du niveau ---
@@ -86,47 +102,10 @@ function drawLevel() {
     for (let y = 0; y < level.length; y++) {
         for (let x = 0; x < level[y].length; x++) {
             const tile = level[y][x];
-            if (tile === 1) drawSprite(solImg, x * TILE_SIZE, y * TILE_SIZE);
-            else if (tile === 2) drawSprite(obstacleImg, x * TILE_SIZE, y * TILE_SIZE);
+            if (tile === 1) ctx.drawImage(solImg, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            else if (tile === 2) ctx.drawImage(obstacleImg, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
     }
-}
-
-// --- Boucle du jeu ---
-function update() {
-    // --- Mouvement horizontal ---
-    player.dx = 0;
-    if (keys['ArrowLeft']) player.dx = -player.speed;
-    if (keys['ArrowRight']) player.dx = player.speed;
-
-    // --- Animation du joueur ---
-    if (player.dx !== 0) {
-        player.frame++;
-        if (player.frame >= player.maxFrames) player.frame = 0;
-    } else {
-        player.frame = 0;
-    }
-
-    // --- Saut ---
-    if (keys['ArrowUp'] && player.onGround) {
-        player.dy = -player.jumpPower;
-        player.onGround = false;
-    }
-
-    // --- Gravité ---
-    player.dy += GRAVITY;
-
-    // --- Déplacement et collisions ---
-    // Déplacement horizontal
-    player.x += player.dx;
-    handleCollisions('x');
-
-    // Déplacement vertical
-    player.y += player.dy;
-    handleCollisions('y');
-
-    draw();
-    requestAnimationFrame(update);
 }
 
 // --- Gestion des collisions ---
@@ -144,11 +123,11 @@ function handleCollisions(axis) {
 
             if (tile === 1) { // SOL
                 if (axis === 'y') {
-                    if (player.dy > 0) { // chute
+                    if (player.dy > 0) {
                         player.y = y * TILE_SIZE - player.height;
                         player.dy = 0;
                         player.onGround = true;
-                    } else if (player.dy < 0) { // plafond
+                    } else if (player.dy < 0) {
                         player.y = (y + 1) * TILE_SIZE;
                         player.dy = 0;
                     }
@@ -162,13 +141,35 @@ function handleCollisions(axis) {
         }
     }
 
-    // Si le joueur tombe en dehors du niveau
     if (player.y > canvas.height) resetPlayer();
+}
+
+// --- Boucle du jeu ---
+function update() {
+    player.dx = 0;
+    if (keys['ArrowLeft']) player.dx = -player.speed;
+    if (keys['ArrowRight']) player.dx = player.speed;
+
+    if (keys['ArrowUp'] && player.onGround) {
+        player.dy = -player.jumpPower;
+        player.onGround = false;
+    }
+
+    player.dy += GRAVITY;
+
+    player.x += player.dx;
+    handleCollisions('x');
+    player.y += player.dy;
+    handleCollisions('y');
+
+    draw();
+    requestAnimationFrame(update);
 }
 
 // --- Dessin ---
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawLevel();
-    drawSprite(playerImg, player.x, player.y, player.frame, 0, player.width, player.height);
+    // Joueur fixe, pas de sprite
+    ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
 }
