@@ -11,10 +11,8 @@ const COLS = 25;
 // --- Images ---
 const playerImg = new Image();
 playerImg.src = 'images/player.png';
-
 const obstacleImg = new Image();
 obstacleImg.src = 'images/obstacle.png';
-
 const solImg = new Image();
 solImg.src = 'images/sol.png';
 
@@ -23,7 +21,6 @@ const bgMusic = new Audio('audio/background.mp3');
 bgMusic.loop = true;
 bgMusic.volume = 0.3;
 bgMusic.play();
-
 const jumpSound = new Audio('audio/jump.mp3');
 const deathSound = new Audio('audio/cridemort.mp3');
 
@@ -31,9 +28,7 @@ const deathSound = new Audio('audio/cridemort.mp3');
 let imagesLoaded = 0;
 function checkAllLoaded() {
     imagesLoaded++;
-    if (imagesLoaded === 3) {
-        update();
-    }
+    if (imagesLoaded === 3) update();
 }
 playerImg.onload = checkAllLoaded;
 obstacleImg.onload = checkAllLoaded;
@@ -55,14 +50,13 @@ let player = {
 // --- Caméra ---
 let cameraX = 0;
 
-// --- Génération du niveau infini ---
-let levels = [generateLevel()]; // tableau de niveaux
-let offsetX = 0; // décalage pour l’infini
+// --- Niveau infini ---
+let levels = [generateLevel()];
+let offsetX = 0;
 
+// --- Génération d'une section ---
 function generateLevel() {
     const level = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
-
-    // Sol
     for (let x = 0; x < COLS; x++) level[ROWS - 1][x] = 1;
 
     let prevY = ROWS - 1;
@@ -77,9 +71,7 @@ function generateLevel() {
         let deltaY = Math.floor(Math.random() * 3) - 1;
         let newY = Math.max(2, Math.min(ROWS - 2, prevY + deltaY));
 
-        for (let x = newX; x < newX + platformLength; x++) {
-            level[newY][x] = 1;
-        }
+        for (let x = newX; x < newX + platformLength; x++) level[newY][x] = 1;
 
         if (Math.random() < 0.3) {
             let obsX = newX + Math.floor(Math.random() * platformLength);
@@ -89,7 +81,6 @@ function generateLevel() {
         prevX = newX + platformLength;
         prevY = newY;
     }
-
     return level;
 }
 
@@ -110,7 +101,6 @@ function resetPlayer() {
     player.onGround = false;
     cameraX = 0;
     levels = [generateLevel()];
-    offsetX = 0;
 }
 
 // --- Dessin du niveau infini ---
@@ -129,7 +119,7 @@ function drawLevel() {
     }
 }
 
-// --- Gestion des collisions ---
+// --- Collisions ---
 function handleCollisions(axis) {
     const left = Math.floor((player.x + cameraX) / TILE_SIZE);
     const right = Math.floor((player.x + player.width + cameraX - 1) / TILE_SIZE);
@@ -166,6 +156,14 @@ function handleCollisions(axis) {
     if (player.y > canvas.height) resetPlayer();
 }
 
+// --- Génération infinie contrôlée ---
+function generateNextSectionIfNeeded() {
+    const currentLevelEnd = levels.length * COLS * TILE_SIZE;
+    if (cameraX + canvas.width + TILE_SIZE * 5 > currentLevelEnd) {
+        levels.push(generateLevel());
+    }
+}
+
 // --- Boucle du jeu ---
 function update() {
     player.dx = 0;
@@ -179,23 +177,17 @@ function update() {
     }
 
     player.dy += GRAVITY;
-
     player.x += player.dx;
     handleCollisions('x');
     player.y += player.dy;
     handleCollisions('y');
 
-    // --- Caméra qui suit joueur ---
-    if (player.x > canvas.width / 2) {
-        cameraX = player.x - canvas.width / 2;
-    }
+    // Caméra qui suit doucement
+    const CAMERA_OFFSET = canvas.width / 3;
+    if (player.x - cameraX > CAMERA_OFFSET) cameraX = player.x - CAMERA_OFFSET;
+    if (player.x - cameraX < CAMERA_OFFSET / 2) cameraX = player.x - CAMERA_OFFSET / 2;
 
-    // --- Génération infinie ---
-    const currentLevelEnd = levels.length * COLS * TILE_SIZE;
-    if (cameraX + canvas.width > currentLevelEnd - TILE_SIZE * 5) {
-        levels.push(generateLevel());
-    }
-
+    generateNextSectionIfNeeded();
     draw();
     requestAnimationFrame(update);
 }
