@@ -20,23 +20,12 @@ solImg.src = 'images/sol.png';
 const bgMusic = new Audio('audio/background.mp3');
 bgMusic.loop = true;
 bgMusic.volume = 0.3;
-bgMusic.play();
 const jumpSound = new Audio('audio/jump.mp3');
 const deathSound = new Audio('audio/cridemort.mp3');
 
-// --- Chargement images ---
-let imagesLoaded = 0;
-function checkAllLoaded() {
-    imagesLoaded++;
-    if (imagesLoaded === 3) update();
-}
-playerImg.onload = checkAllLoaded;
-obstacleImg.onload = checkAllLoaded;
-solImg.onload = checkAllLoaded;
-
 // --- Joueur ---
 let player = {
-    x: canvas.width / 3, // fixe sur l'écran
+    x: canvas.width / 3,
     y: canvas.height - TILE_SIZE * 2,
     width: TILE_SIZE,
     height: TILE_SIZE,
@@ -49,9 +38,40 @@ let player = {
 
 // --- Caméra ---
 let cameraX = 0;
+let totalOffset = 0; // décalage total pour score et collisions
+
+// --- Coyote time ---
+const COYOTE_FRAMES = 10;
+let coyoteTime = 0;
+
+// --- Score ---
+let score = 0;
+
+// --- Effet mort ---
+let flash = 0;
 
 // --- Niveau infini ---
 let levels = [generateLevel()];
+
+// --- Chargement images ---
+let imagesLoaded = 0;
+function checkAllLoaded() {
+    imagesLoaded++;
+    if (imagesLoaded === 3) startGame();
+}
+playerImg.onload = checkAllLoaded;
+obstacleImg.onload = checkAllLoaded;
+solImg.onload = checkAllLoaded;
+
+// --- Touches ---
+const keys = {};
+document.addEventListener('keydown', e => keys[e.key] = true);
+document.addEventListener('keyup', e => keys[e.key] = false);
+
+// Toggle musique
+document.addEventListener('keydown', e => {
+    if (e.key === 'm') bgMusic.paused ? bgMusic.play() : bgMusic.pause();
+});
 
 // --- Génération d'une section ---
 function generateLevel() {
@@ -83,24 +103,22 @@ function generateLevel() {
     return level;
 }
 
-// --- Touches ---
-const keys = {};
-document.addEventListener('keydown', e => keys[e.key] = true);
-document.addEventListener('keyup', e => keys[e.key] = false);
-
 // --- Reset joueur ---
 function resetPlayer() {
     deathSound.play();
-    setTimeout(() => deathSound.pause(), 3000);
-
-    player.y = canvas.height - TILE_SIZE * 2;
-    player.dy = 0;
-    player.onGround = false;
-    cameraX = 0;
-    levels = [generateLevel()];
+    flash = 10; // effet flash
+    setTimeout(() => {
+        player.y = canvas.height - TILE_SIZE * 2;
+        player.dy = 0;
+        player.onGround = false;
+        cameraX = 0;
+        totalOffset = 0;
+        levels = [generateLevel()];
+        score = 0;
+    }, 500);
 }
 
-// --- Dessin du niveau infini ---
+// --- Dessin du niveau ---
 function drawLevel() {
     for (let l = 0; l < levels.length; l++) {
         const level = levels[l];
@@ -116,7 +134,7 @@ function drawLevel() {
     }
 }
 
-// --- Collisions ---
+// --- Collisions optimisées ---
 function handleCollisions() {
     const worldX = cameraX + player.x;
     const left = Math.floor(worldX / TILE_SIZE);
@@ -124,19 +142,27 @@ function handleCollisions() {
     const top = Math.floor(player.y / TILE_SIZE);
     const bottom = Math.floor((player.y + player.height - 1) / TILE_SIZE);
 
+    player.onGround = false;
+
     for (let l = 0; l < levels.length; l++) {
         const level = levels[l];
         for (let y = top; y <= bottom; y++) {
             for (let x = left - l * COLS; x <= right - l * COLS; x++) {
-                if (!level[y] || !level[y][x]) continue;
+                if (x < 0 || x >= COLS || !level[y] || !level[y][x]) continue;
                 const tile = level[y][x];
+                const tileTop = y * TILE_SIZE;
+                const tileBottom = tileTop + TILE_SIZE;
+                const tileLeft = x * TILE_SIZE + l * COLS * TILE_SIZE;
+                const tileRight = tileLeft + TILE_SIZE;
+
                 if (tile === 1) {
-                    if (player.dy > 0) {
-                        player.y = y * TILE_SIZE - player.height;
+                    if (player.dy > 0 && player.y + player.height > tileTop && player.y < tileTop) {
+                        player.y = tileTop - player.height;
                         player.dy = 0;
                         player.onGround = true;
-                    } else if (player.dy < 0) {
-                        player.y = (y + 1) * TILE_SIZE;
+                        coyoteTime = COYOTE_FRAMES;
+                    } else if (player.dy < 0 && player.y < tileBottom && player.y + player.height > tileBottom) {
+                        player.y = tileBottom;
                         player.dy = 0;
                     }
                 } else if (tile === 2) {
@@ -149,11 +175,16 @@ function handleCollisions() {
     if (player.y > canvas.height) resetPlayer();
 }
 
-// --- Génération infinie contrôlée ---
+// --- Génération infinie ---
 function generateNextSectionIfNeeded() {
     const currentLevelEnd = levels.length * COLS * TILE_SIZE;
     if (cameraX + canvas.width + TILE_SIZE * 5 > currentLevelEnd) {
         levels.push(generateLevel());
+    }
+
+    if (levels.length > 3) {
+        totalOffset += COLS * TILE_SIZE;
+        levels.shift();
     }
 }
 
@@ -162,17 +193,23 @@ function update() {
     if (keys['ArrowRight']) cameraX += player.speed;
     if (keys['ArrowLeft'] && cameraX > 0) cameraX -= player.speed;
 
-    if (keys['ArrowUp'] && player.onGround) {
+    if (keys['ArrowUp'] && coyoteTime > 0) {
         player.dy = -player.jumpPower;
         player.onGround = false;
         jumpSound.play();
+        coyoteTime = 0;
     }
 
     player.dy += GRAVITY;
     player.y += player.dy;
 
+    if (coyoteTime > 0) coyoteTime--;
+
     handleCollisions();
     generateNextSectionIfNeeded();
+
+    score = Math.floor((cameraX + totalOffset) / 10); // score basé sur la distance
+
     draw();
     requestAnimationFrame(update);
 }
@@ -180,6 +217,27 @@ function update() {
 // --- Dessin ---
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (flash > 0) {
+        ctx.fillStyle = 'rgba(255,0,0,0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        flash--;
+    }
+
     drawLevel();
     ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+
+    // Score
+    ctx.fillStyle = 'white';
+    ctx.font = '20px Arial';
+    ctx.fillText('Score: ' + score, 10, 30);
+}
+
+// --- Démarrage du jeu ---
+function startGame() {
+    document.addEventListener('keydown', () => {
+        if (bgMusic.paused) bgMusic.play();
+    }, { once: true });
+
+    update();
 }
