@@ -60,14 +60,31 @@ let player = {
 // ====================
 // CAMERA
 // ====================
-
-// La caméra sert à donner l’impression que le joueur avance
-let cameraX = 0;
+let cameraX = 0; // La caméra suit le joueur (décalage horizontal)
 
 
 // ====================
-// NIVEAU
+// GENERATION DU NIVEAU
 // ====================
+function generateLevel() {
+    const rows = 20;  // hauteur du niveau (en cases)
+    const cols = 50;  // largeur de départ
+    let grid = [];
+
+    for (let y = 0; y < rows; y++) {
+        grid[y] = [];
+        for (let x = 0; x < cols; x++) {
+            if (y === rows - 1) {
+                grid[y][x] = 1; // sol
+            } else if (Math.random() < 0.1 && y === rows - 2) {
+                grid[y][x] = 2; // obstacle
+            } else {
+                grid[y][x] = 0; // vide
+            }
+        }
+    }
+    return grid;
+}
 
 // Génère un premier niveau
 let level = generateLevel();
