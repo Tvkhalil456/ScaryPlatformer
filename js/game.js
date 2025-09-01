@@ -38,7 +38,7 @@ let player = {
 
 // --- Caméra ---
 let cameraX = 0;
-let totalOffset = 0; // décalage total pour score et collisions
+let totalOffset = 0;
 
 // --- Coyote time ---
 const COYOTE_FRAMES = 10;
@@ -52,6 +52,17 @@ let flash = 0;
 
 // --- Niveau infini ---
 let levels = [generateLevel()];
+
+// --- État du jeu ---
+let gameState = 'menu'; // 'menu', 'playing', 'gameover'
+
+// --- Bouton Play ---
+const playButton = {
+    x: canvas.width / 2 - 120,
+    y: canvas.height / 2 - 40,
+    width: 240,
+    height: 80
+};
 
 // --- Chargement images ---
 let imagesLoaded = 0;
@@ -71,6 +82,20 @@ document.addEventListener('keyup', e => keys[e.key] = false);
 // Toggle musique
 document.addEventListener('keydown', e => {
     if (e.key === 'm') bgMusic.paused ? bgMusic.play() : bgMusic.pause();
+});
+
+// --- Gestion clic sur bouton Play ---
+canvas.addEventListener('click', e => {
+    if (gameState === 'menu') {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        if (mouseX >= playButton.x && mouseX <= playButton.x + playButton.width &&
+            mouseY >= playButton.y && mouseY <= playButton.y + playButton.height) {
+            gameState = 'playing';
+        }
+    }
 });
 
 // --- Génération d'une section ---
@@ -106,32 +131,10 @@ function generateLevel() {
 // --- Reset joueur ---
 function resetPlayer() {
     deathSound.play();
-    flash = 10; // effet flash
+    flash = 10;
     setTimeout(() => {
-        player.y = canvas.height - TILE_SIZE * 2;
-        player.dy = 0;
-        player.onGround = false;
-        cameraX = 0;
-        totalOffset = 0;
-        levels = [generateLevel()];
-        score = 0;
+        gameState = 'gameover';
     }, 500);
-}
-
-// --- Dessin du niveau ---
-function drawLevel() {
-    for (let l = 0; l < levels.length; l++) {
-        const level = levels[l];
-        for (let y = 0; y < level.length; y++) {
-            for (let x = 0; x < level[y].length; x++) {
-                const tile = level[y][x];
-                const drawX = x * TILE_SIZE + l * COLS * TILE_SIZE - cameraX;
-                const drawY = y * TILE_SIZE;
-                if (tile === 1) ctx.drawImage(solImg, drawX, drawY, TILE_SIZE, TILE_SIZE);
-                else if (tile === 2) ctx.drawImage(obstacleImg, drawX, drawY, TILE_SIZE, TILE_SIZE);
-            }
-        }
-    }
 }
 
 // --- Collisions optimisées ---
@@ -152,8 +155,6 @@ function handleCollisions() {
                 const tile = level[y][x];
                 const tileTop = y * TILE_SIZE;
                 const tileBottom = tileTop + TILE_SIZE;
-                const tileLeft = x * TILE_SIZE + l * COLS * TILE_SIZE;
-                const tileRight = tileLeft + TILE_SIZE;
 
                 if (tile === 1) {
                     if (player.dy > 0 && player.y + player.height > tileTop && player.y < tileTop) {
@@ -190,6 +191,12 @@ function generateNextSectionIfNeeded() {
 
 // --- Boucle du jeu ---
 function update() {
+    if (gameState === 'menu' || gameState === 'gameover') {
+        draw();
+        requestAnimationFrame(update);
+        return;
+    }
+
     if (keys['ArrowRight']) cameraX += player.speed;
     if (keys['ArrowLeft'] && cameraX > 0) cameraX -= player.speed;
 
@@ -208,7 +215,7 @@ function update() {
     handleCollisions();
     generateNextSectionIfNeeded();
 
-    score = Math.floor((cameraX + totalOffset) / 10); // score basé sur la distance
+    score = Math.floor((cameraX + totalOffset) / 10);
 
     draw();
     requestAnimationFrame(update);
@@ -217,6 +224,33 @@ function update() {
 // --- Dessin ---
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (gameState === 'menu') {
+        // Fond noir
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Titre rouge
+        ctx.fillStyle = 'red';
+        ctx.font = '60px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('Tralalero Tralarun', canvas.width / 2, 100);
+
+        // Bouton Play
+        ctx.fillStyle = '#FFEB3B';
+        ctx.fillRect(playButton.x, playButton.y, playButton.width, playButton.height);
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(playButton.x, playButton.y, playButton.width, playButton.height);
+
+        ctx.fillStyle = 'black';
+        ctx.font = '30px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('PLAY', canvas.width / 2, canvas.height / 2);
+
+        return;
+    }
 
     if (flash > 0) {
         ctx.fillStyle = 'rgba(255,0,0,0.5)';
@@ -229,8 +263,19 @@ function draw() {
 
     // Score
     ctx.fillStyle = 'white';
-    ctx.font = '20px Arial';
+    ctx.font = '20px "Press Start 2P", monospace';
+    ctx.textAlign = 'left';
     ctx.fillText('Score: ' + score, 10, 30);
+
+    if (gameState === 'gameover') {
+        ctx.fillStyle = 'white';
+        ctx.font = '40px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.font = '25px "Press Start 2P", monospace';
+        ctx.fillText('Score final: ' + score, canvas.width / 2, canvas.height / 2 + 20);
+        ctx.fillText('Clique sur PLAY pour rejouer', canvas.width / 2, canvas.height / 2 + 60);
+    }
 }
 
 // --- Démarrage du jeu ---
