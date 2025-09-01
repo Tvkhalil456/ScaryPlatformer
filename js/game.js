@@ -5,6 +5,8 @@ const ctx = canvas.getContext('2d');
 
 const TILE_SIZE = 32;
 const GRAVITY = 0.5;
+const ROWS = 20;
+const COLS = 25;
 
 // --- Images ---
 const playerImg = new Image();
@@ -25,7 +27,7 @@ bgMusic.play();
 const jumpSound = new Audio('audio/jump.mp3');
 const deathSound = new Audio('audio/cridemort.mp3');
 
-// Vérifier que toutes les images sont chargées
+// --- Chargement images ---
 let imagesLoaded = 0;
 function checkAllLoaded() {
     imagesLoaded++;
@@ -50,10 +52,14 @@ let player = {
     onGround: false
 };
 
-// --- Génération du niveau ---
+// --- Caméra ---
+let cameraX = 0;
+
+// --- Génération du niveau infini ---
+let levels = [generateLevel()]; // tableau de niveaux
+let offsetX = 0; // décalage pour l’infini
+
 function generateLevel() {
-    const ROWS = 20;
-    const COLS = 25;
     const level = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
 
     // Sol
@@ -75,7 +81,6 @@ function generateLevel() {
             level[newY][x] = 1;
         }
 
-        // Obstacle aléatoire
         if (Math.random() < 0.3) {
             let obsX = newX + Math.floor(Math.random() * platformLength);
             level[newY - 1][obsX] = 2;
@@ -88,8 +93,6 @@ function generateLevel() {
     return level;
 }
 
-let level = generateLevel();
-
 // --- Touches ---
 const keys = {};
 document.addEventListener('keydown', e => keys[e.key] = true);
@@ -97,7 +100,6 @@ document.addEventListener('keyup', e => keys[e.key] = false);
 
 // --- Reset joueur ---
 function resetPlayer() {
-    // Son de mort pendant 3 secondes
     deathSound.play();
     setTimeout(() => deathSound.pause(), 3000);
 
@@ -106,48 +108,57 @@ function resetPlayer() {
     player.dx = 0;
     player.dy = 0;
     player.onGround = false;
+    cameraX = 0;
+    levels = [generateLevel()];
+    offsetX = 0;
 }
 
-// --- Dessin du niveau ---
+// --- Dessin du niveau infini ---
 function drawLevel() {
-    for (let y = 0; y < level.length; y++) {
-        for (let x = 0; x < level[y].length; x++) {
-            const tile = level[y][x];
-            if (tile === 1) ctx.drawImage(solImg, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-            else if (tile === 2) ctx.drawImage(obstacleImg, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    for (let l = 0; l < levels.length; l++) {
+        const level = levels[l];
+        for (let y = 0; y < level.length; y++) {
+            for (let x = 0; x < level[y].length; x++) {
+                const tile = level[y][x];
+                const drawX = x * TILE_SIZE + l * COLS * TILE_SIZE - cameraX;
+                const drawY = y * TILE_SIZE;
+                if (tile === 1) ctx.drawImage(solImg, drawX, drawY, TILE_SIZE, TILE_SIZE);
+                else if (tile === 2) ctx.drawImage(obstacleImg, drawX, drawY, TILE_SIZE, TILE_SIZE);
+            }
         }
     }
 }
 
 // --- Gestion des collisions ---
 function handleCollisions(axis) {
-    const left = Math.floor(player.x / TILE_SIZE);
-    const right = Math.floor((player.x + player.width - 1) / TILE_SIZE);
+    const left = Math.floor((player.x + cameraX) / TILE_SIZE);
+    const right = Math.floor((player.x + player.width + cameraX - 1) / TILE_SIZE);
     const top = Math.floor(player.y / TILE_SIZE);
     const bottom = Math.floor((player.y + player.height - 1) / TILE_SIZE);
 
-    for (let y = top; y <= bottom; y++) {
-        for (let x = left; x <= right; x++) {
-            if (!level[y] || !level[y][x]) continue;
-
-            const tile = level[y][x];
-
-            if (tile === 1) { // SOL
-                if (axis === 'y') {
-                    if (player.dy > 0) {
-                        player.y = y * TILE_SIZE - player.height;
-                        player.dy = 0;
-                        player.onGround = true;
-                    } else if (player.dy < 0) {
-                        player.y = (y + 1) * TILE_SIZE;
-                        player.dy = 0;
+    for (let l = 0; l < levels.length; l++) {
+        const level = levels[l];
+        for (let y = top; y <= bottom; y++) {
+            for (let x = left - l * COLS; x <= right - l * COLS; x++) {
+                if (!level[y] || !level[y][x]) continue;
+                const tile = level[y][x];
+                if (tile === 1) {
+                    if (axis === 'y') {
+                        if (player.dy > 0) {
+                            player.y = y * TILE_SIZE - player.height;
+                            player.dy = 0;
+                            player.onGround = true;
+                        } else if (player.dy < 0) {
+                            player.y = (y + 1) * TILE_SIZE;
+                            player.dy = 0;
+                        }
+                    } else if (axis === 'x') {
+                        if (player.dx > 0) player.x = x * TILE_SIZE + l * COLS * TILE_SIZE - cameraX - player.width;
+                        else if (player.dx < 0) player.x = x * TILE_SIZE + l * COLS * TILE_SIZE - cameraX + TILE_SIZE;
                     }
-                } else if (axis === 'x') {
-                    if (player.dx > 0) player.x = x * TILE_SIZE - player.width;
-                    else if (player.dx < 0) player.x = (x + 1) * TILE_SIZE;
+                } else if (tile === 2) {
+                    resetPlayer();
                 }
-            } else if (tile === 2) { // OBSTACLE
-                resetPlayer();
             }
         }
     }
@@ -164,7 +175,7 @@ function update() {
     if (keys['ArrowUp'] && player.onGround) {
         player.dy = -player.jumpPower;
         player.onGround = false;
-        jumpSound.play(); // son du saut
+        jumpSound.play();
     }
 
     player.dy += GRAVITY;
@@ -173,6 +184,17 @@ function update() {
     handleCollisions('x');
     player.y += player.dy;
     handleCollisions('y');
+
+    // --- Caméra qui suit joueur ---
+    if (player.x > canvas.width / 2) {
+        cameraX = player.x - canvas.width / 2;
+    }
+
+    // --- Génération infinie ---
+    const currentLevelEnd = levels.length * COLS * TILE_SIZE;
+    if (cameraX + canvas.width > currentLevelEnd - TILE_SIZE * 5) {
+        levels.push(generateLevel());
+    }
 
     draw();
     requestAnimationFrame(update);
