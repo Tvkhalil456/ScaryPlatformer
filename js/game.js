@@ -49,6 +49,7 @@ let player = {
 
 // --- Caméra ---
 let cameraX = 0;
+let targetCameraX = 0; // objectif de la caméra
 
 // --- Niveau infini ---
 let levels = [generateLevel()];
@@ -100,6 +101,7 @@ function resetPlayer() {
     player.dy = 0;
     player.onGround = false;
     cameraX = 0;
+    targetCameraX = 0;
     levels = [generateLevel()];
 }
 
@@ -182,10 +184,10 @@ function update() {
     player.y += player.dy;
     handleCollisions('y');
 
-    // Caméra qui suit doucement
+    // Caméra fluide
     const CAMERA_OFFSET = canvas.width / 3;
-    if (player.x - cameraX > CAMERA_OFFSET) cameraX = player.x - CAMERA_OFFSET;
-    if (player.x - cameraX < CAMERA_OFFSET / 2) cameraX = player.x - CAMERA_OFFSET / 2;
+    targetCameraX = player.x - CAMERA_OFFSET; 
+    cameraX += (targetCameraX - cameraX) * 0.05; // 0.05 = vitesse de rattrapage
 
     generateNextSectionIfNeeded();
     draw();
