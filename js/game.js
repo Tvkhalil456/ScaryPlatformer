@@ -36,7 +36,7 @@ solImg.onload = checkAllLoaded;
 
 // --- Joueur ---
 let player = {
-    x: TILE_SIZE * 2,
+    x: canvas.width / 3, // fixe sur l'écran
     y: canvas.height - TILE_SIZE * 2,
     width: TILE_SIZE,
     height: TILE_SIZE,
@@ -49,11 +49,9 @@ let player = {
 
 // --- Caméra ---
 let cameraX = 0;
-let targetCameraX = 0; // objectif de la caméra
 
 // --- Niveau infini ---
 let levels = [generateLevel()];
-let offsetX = 0;
 
 // --- Génération d'une section ---
 function generateLevel() {
@@ -95,13 +93,10 @@ function resetPlayer() {
     deathSound.play();
     setTimeout(() => deathSound.pause(), 3000);
 
-    player.x = TILE_SIZE * 2;
     player.y = canvas.height - TILE_SIZE * 2;
-    player.dx = 0;
     player.dy = 0;
     player.onGround = false;
     cameraX = 0;
-    targetCameraX = 0;
     levels = [generateLevel()];
 }
 
@@ -122,9 +117,10 @@ function drawLevel() {
 }
 
 // --- Collisions ---
-function handleCollisions(axis) {
-    const left = Math.floor((player.x + cameraX) / TILE_SIZE);
-    const right = Math.floor((player.x + player.width + cameraX - 1) / TILE_SIZE);
+function handleCollisions() {
+    const worldX = cameraX + player.x;
+    const left = Math.floor(worldX / TILE_SIZE);
+    const right = Math.floor((worldX + player.width - 1) / TILE_SIZE);
     const top = Math.floor(player.y / TILE_SIZE);
     const bottom = Math.floor((player.y + player.height - 1) / TILE_SIZE);
 
@@ -135,18 +131,13 @@ function handleCollisions(axis) {
                 if (!level[y] || !level[y][x]) continue;
                 const tile = level[y][x];
                 if (tile === 1) {
-                    if (axis === 'y') {
-                        if (player.dy > 0) {
-                            player.y = y * TILE_SIZE - player.height;
-                            player.dy = 0;
-                            player.onGround = true;
-                        } else if (player.dy < 0) {
-                            player.y = (y + 1) * TILE_SIZE;
-                            player.dy = 0;
-                        }
-                    } else if (axis === 'x') {
-                        if (player.dx > 0) player.x = x * TILE_SIZE + l * COLS * TILE_SIZE - cameraX - player.width;
-                        else if (player.dx < 0) player.x = x * TILE_SIZE + l * COLS * TILE_SIZE - cameraX + TILE_SIZE;
+                    if (player.dy > 0) {
+                        player.y = y * TILE_SIZE - player.height;
+                        player.dy = 0;
+                        player.onGround = true;
+                    } else if (player.dy < 0) {
+                        player.y = (y + 1) * TILE_SIZE;
+                        player.dy = 0;
                     }
                 } else if (tile === 2) {
                     resetPlayer();
@@ -168,9 +159,8 @@ function generateNextSectionIfNeeded() {
 
 // --- Boucle du jeu ---
 function update() {
-    player.dx = 0;
-    if (keys['ArrowLeft']) player.dx = -player.speed;
-    if (keys['ArrowRight']) player.dx = player.speed;
+    if (keys['ArrowRight']) cameraX += player.speed;
+    if (keys['ArrowLeft'] && cameraX > 0) cameraX -= player.speed;
 
     if (keys['ArrowUp'] && player.onGround) {
         player.dy = -player.jumpPower;
@@ -179,16 +169,9 @@ function update() {
     }
 
     player.dy += GRAVITY;
-    player.x += player.dx;
-    handleCollisions('x');
     player.y += player.dy;
-    handleCollisions('y');
 
-    // Caméra fluide
-    const CAMERA_OFFSET = canvas.width / 3;
-    targetCameraX = player.x - CAMERA_OFFSET; 
-    cameraX += (targetCameraX - cameraX) * 0.05; // 0.05 = vitesse de rattrapage
-
+    handleCollisions();
     generateNextSectionIfNeeded();
     draw();
     requestAnimationFrame(update);
