@@ -16,6 +16,10 @@ obstacleImg.src = 'images/obstacle.png';
 const solImg = new Image();
 solImg.src = 'images/sol.png';
 
+// --- Image du Screamer --- // AJOUT
+const screamerImg = new Image();
+screamerImg.src = 'smiledogs.jpg';
+
 // --- Audio ---
 const bgMusic = new Audio('audio/background.mp3');
 bgMusic.loop = true;
@@ -55,6 +59,9 @@ let levels = [generateLevel()];
 
 // --- État du jeu ---
 let gameState = 'menu'; // 'menu', 'playing', 'gameover'
+
+// Variable pour savoir si le screamer est actif // AJOUT
+let screamerActive = false;
 
 // --- Bouton Play ---
 const playButton = {
@@ -106,6 +113,7 @@ canvas.addEventListener('click', e => {
             levels = [generateLevel()];
             score = 0;
             flash = 0;
+            screamerActive = false; // AJOUT
 
             gameState = 'playing';
         }
@@ -142,14 +150,16 @@ function generateLevel() {
     return level;
 }
 
-// --- Reset joueur ---
-function resetPlayer() {
-    deathSound.play();
+// --- Quand le joueur meurt --- // MODIFIÉ (anciennement resetPlayer)
+function playerDie() {
+    gameState = 'gameover';
     flash = 10;
-    setTimeout(() => {
-        gameState = 'gameover';
-    }, 500);
+
+    // Détermine si le screamer apparaît
+    screamerActive = Math.random() < 0.2; // 20% de chance
+    deathSound.play();
 }
+
 
 // --- Collisions ---
 function handleCollisions() {
@@ -181,13 +191,13 @@ function handleCollisions() {
                         player.dy = 0;
                     }
                 } else if (tile === 2) {
-                    resetPlayer();
+                    playerDie(); // MODIFIÉ
                 }
             }
         }
     }
 
-    if (player.y > canvas.height) resetPlayer();
+    if (player.y > canvas.height) playerDie(); // MODIFIÉ
 }
 
 // --- Génération infinie ---
@@ -205,35 +215,32 @@ function generateNextSectionIfNeeded() {
 
 // --- Boucle du jeu ---
 function update() {
-    if (gameState === 'menu' || gameState === 'gameover') {
-        draw();
-        requestAnimationFrame(update);
-        return;
+    if (gameState === 'playing') {
+        if (keys['ArrowRight']) cameraX += player.speed;
+        if (keys['ArrowLeft'] && cameraX > 0) cameraX -= player.speed;
+    
+        if (keys['ArrowUp'] && coyoteTime > 0) {
+            player.dy = -player.jumpPower;
+            player.onGround = false;
+            jumpSound.play();
+            coyoteTime = 0;
+        }
+    
+        player.dy += GRAVITY;
+        player.y += player.dy;
+    
+        if (coyoteTime > 0) coyoteTime--;
+    
+        handleCollisions();
+        generateNextSectionIfNeeded();
+    
+        score = Math.floor((cameraX + totalOffset) / 10);
     }
-
-    if (keys['ArrowRight']) cameraX += player.speed;
-    if (keys['ArrowLeft'] && cameraX > 0) cameraX -= player.speed;
-
-    if (keys['ArrowUp'] && coyoteTime > 0) {
-        player.dy = -player.jumpPower;
-        player.onGround = false;
-        jumpSound.play();
-        coyoteTime = 0;
-    }
-
-    player.dy += GRAVITY;
-    player.y += player.dy;
-
-    if (coyoteTime > 0) coyoteTime--;
-
-    handleCollisions();
-    generateNextSectionIfNeeded();
-
-    score = Math.floor((cameraX + totalOffset) / 10);
-
+    
     draw();
     requestAnimationFrame(update);
 }
+
 
 // --- Dessin ---
 function draw() {
@@ -278,14 +285,22 @@ function draw() {
     ctx.textAlign = 'left';
     ctx.fillText('Score: ' + score, 10, 30);
 
+    // MODIFIÉ : Bloc 'gameover'
     if (gameState === 'gameover') {
-        ctx.fillStyle = 'white';
-        ctx.font = '40px "Press Start 2P", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 20);
-        ctx.font = '25px "Press Start 2P", monospace';
-        ctx.fillText('Score final: ' + score, canvas.width / 2, canvas.height / 2 + 20);
-        ctx.fillText('Clique sur PLAY pour rejouer', canvas.width / 2, canvas.height / 2 + 60);
+        if (screamerActive && screamerImg.complete) {
+            // Affiche l'image en plein écran
+            ctx.drawImage(screamerImg, 0, 0, canvas.width, canvas.height);
+        } else {
+            // Texte classique si pas de screamer
+            ctx.fillStyle = 'red';
+            ctx.font = '40px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 40);
+            
+            ctx.font = '25px "Press Start 2P", monospace';
+            ctx.fillText('Score final: ' + score, canvas.width / 2, canvas.height / 2 + 20);
+            ctx.fillText('Clique sur PLAY pour rejouer', canvas.width / 2, canvas.height / 2 + 60);
+        }
     }
 }
 
