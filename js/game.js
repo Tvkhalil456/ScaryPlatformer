@@ -94,17 +94,19 @@ canvas.addEventListener('click', e => {
         if (mouseX >= playButton.x && mouseX <= playButton.x + playButton.width &&
             mouseY >= playButton.y && mouseY <= playButton.y + playButton.height) {
             
-            // --- Réinitialisation complète du jeu ---
+            // --- Réinitialisation complète ---
+            player.x = canvas.width / 3;
             player.y = canvas.height - TILE_SIZE * 2;
+            player.dx = 0;
             player.dy = 0;
             player.onGround = false;
+
             cameraX = 0;
             totalOffset = 0;
             levels = [generateLevel()];
             score = 0;
             flash = 0;
 
-            // Changement d'état
             gameState = 'playing';
         }
     }
@@ -149,7 +151,7 @@ function resetPlayer() {
     }, 500);
 }
 
-// --- Collisions optimisées ---
+// --- Collisions ---
 function handleCollisions() {
     const worldX = cameraX + player.x;
     const left = Math.floor(worldX / TILE_SIZE);
@@ -238,11 +240,9 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (gameState === 'menu') {
-        // Fond noir
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Titre rouge
         ctx.fillStyle = 'red';
         ctx.font = '60px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
@@ -273,7 +273,6 @@ function draw() {
     drawLevel();
     ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
 
-    // Score
     ctx.fillStyle = 'white';
     ctx.font = '20px "Press Start 2P", monospace';
     ctx.textAlign = 'left';
@@ -308,9 +307,10 @@ function drawLevel() {
 
 // --- Démarrage du jeu ---
 function startGame() {
+    // Démarre la musique après une interaction utilisateur
     document.addEventListener('keydown', () => {
         if (bgMusic.paused) bgMusic.play();
     }, { once: true });
 
-    update();
+    update(); // Lance la boucle
 }
