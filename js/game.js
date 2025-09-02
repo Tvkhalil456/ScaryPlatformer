@@ -86,13 +86,25 @@ document.addEventListener('keydown', e => {
 
 // --- Gestion clic sur bouton Play ---
 canvas.addEventListener('click', e => {
-    if (gameState === 'menu') {
+    if (gameState === 'menu' || gameState === 'gameover') {
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
         if (mouseX >= playButton.x && mouseX <= playButton.x + playButton.width &&
             mouseY >= playButton.y && mouseY <= playButton.y + playButton.height) {
+            
+            // --- Réinitialisation complète du jeu ---
+            player.y = canvas.height - TILE_SIZE * 2;
+            player.dy = 0;
+            player.onGround = false;
+            cameraX = 0;
+            totalOffset = 0;
+            levels = [generateLevel()];
+            score = 0;
+            flash = 0;
+
+            // Changement d'état
             gameState = 'playing';
         }
     }
@@ -275,6 +287,22 @@ function draw() {
         ctx.font = '25px "Press Start 2P", monospace';
         ctx.fillText('Score final: ' + score, canvas.width / 2, canvas.height / 2 + 20);
         ctx.fillText('Clique sur PLAY pour rejouer', canvas.width / 2, canvas.height / 2 + 60);
+    }
+}
+
+// --- Dessin du niveau ---
+function drawLevel() {
+    for (let l = 0; l < levels.length; l++) {
+        const level = levels[l];
+        for (let y = 0; y < level.length; y++) {
+            for (let x = 0; x < level[y].length; x++) {
+                const tile = level[y][x];
+                const drawX = x * TILE_SIZE + l * COLS * TILE_SIZE - cameraX;
+                const drawY = y * TILE_SIZE;
+                if (tile === 1) ctx.drawImage(solImg, drawX, drawY, TILE_SIZE, TILE_SIZE);
+                else if (tile === 2) ctx.drawImage(obstacleImg, drawX, drawY, TILE_SIZE, TILE_SIZE);
+            }
+        }
     }
 }
 
