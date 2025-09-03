@@ -15,8 +15,12 @@ const obstacleImg = new Image();
 obstacleImg.src = 'images/obstacle.png';
 const solImg = new Image();
 solImg.src = 'images/sol.png';
+
+// --- Image du Screamer --- // AJOUT
 const screamerImg = new Image();
 screamerImg.src = 'images/smiledogs.jpg';
+screamerImg.onload = checkAllLoaded;
+screamerImg.onerror = () => console.error("Impossible de charger le screamer !");
 
 // --- Audio ---
 const bgMusic = new Audio('audio/background.mp3');
@@ -58,9 +62,8 @@ let levels = [generateLevel()];
 // --- État du jeu ---
 let gameState = 'menu'; // 'menu', 'playing', 'gameover'
 
-// --- Screamer ---
+// Variable pour savoir si le screamer est actif
 let screamerActive = false;
-let screamerTimer = 0;
 
 // --- Bouton Play ---
 const playButton = {
@@ -74,35 +77,21 @@ const playButton = {
 let imagesLoaded = 0;
 function checkAllLoaded() {
     imagesLoaded++;
-    if (imagesLoaded === 4) startGame();
+    if (imagesLoaded === 4) startGame(); // 4 images à charger maintenant
 }
 playerImg.onload = checkAllLoaded;
 obstacleImg.onload = checkAllLoaded;
 solImg.onload = checkAllLoaded;
-screamerImg.onload = checkAllLoaded;
 
 // --- Touches ---
 const keys = {};
-let jumpPressed = false;
-
-document.addEventListener('keydown', e => {
-    if (e.key === 'ArrowUp') jumpPressed = true;
-    keys[e.key] = true;
-});
-document.addEventListener('keyup', e => {
-    if (e.key === 'ArrowUp') jumpPressed = false;
-    keys[e.key] = false;
-});
+document.addEventListener('keydown', e => keys[e.key] = true);
+document.addEventListener('keyup', e => keys[e.key] = false);
 
 // Toggle musique
 document.addEventListener('keydown', e => {
     if (e.key === 'm') bgMusic.paused ? bgMusic.play() : bgMusic.pause();
 });
-
-// Démarrage musique sur interaction
-document.addEventListener('click', () => {
-    if (bgMusic.paused) bgMusic.play();
-}, { once: true });
 
 // --- Gestion clic sur bouton Play ---
 canvas.addEventListener('click', e => {
@@ -114,20 +103,18 @@ canvas.addEventListener('click', e => {
         if (mouseX >= playButton.x && mouseX <= playButton.x + playButton.width &&
             mouseY >= playButton.y && mouseY <= playButton.y + playButton.height) {
             
-            // --- Reset ---
+            // --- Réinitialisation complète ---
             player.x = canvas.width / 3;
             player.y = canvas.height - TILE_SIZE * 2;
             player.dx = 0;
             player.dy = 0;
             player.onGround = false;
-
             cameraX = 0;
             totalOffset = 0;
             levels = [generateLevel()];
             score = 0;
             flash = 0;
             screamerActive = false;
-            screamerTimer = 0;
 
             gameState = 'playing';
         }
@@ -169,11 +156,8 @@ function playerDie() {
     gameState = 'gameover';
     flash = 10;
 
-    if (Math.random() < 0.2) { // 20% chance
-        screamerActive = true;
-        screamerTimer = 120; // 2s à 60 FPS
-    }
-
+    // Détermine si le screamer apparaît
+    screamerActive = Math.random() < 0.2; // 20% de chance
     deathSound.play();
 }
 
@@ -186,36 +170,24 @@ function handleCollisions() {
     const bottom = Math.floor((player.y + player.height - 1) / TILE_SIZE);
 
     player.onGround = false;
-
     for (let l = 0; l < levels.length; l++) {
         const level = levels[l];
         for (let y = top; y <= bottom; y++) {
             for (let x = left - l * COLS; x <= right - l * COLS; x++) {
                 if (x < 0 || x >= COLS || !level[y] || !level[y][x]) continue;
                 const tile = level[y][x];
-                const tileX = x * TILE_SIZE + l * COLS * TILE_SIZE - cameraX;
-                const tileY = y * TILE_SIZE;
+                const tileTop = y * TILE_SIZE;
+                const tileBottom = tileTop + TILE_SIZE;
 
                 if (tile === 1) {
-                    // Bas
-                    if (player.dy > 0 && player.y + player.height > tileY && player.y < tileY) {
-                        player.y = tileY - player.height;
+                    if (player.dy > 0 && player.y + player.height > tileTop && player.y < tileTop) {
+                        player.y = tileTop - player.height;
                         player.dy = 0;
                         player.onGround = true;
                         coyoteTime = COYOTE_FRAMES;
-                    }
-                    // Haut
-                    else if (player.dy < 0 && player.y < tileY + TILE_SIZE && player.y + player.height > tileY + TILE_SIZE) {
-                        player.y = tileY + TILE_SIZE;
+                    } else if (player.dy < 0 && player.y < tileBottom && player.y + player.height > tileBottom) {
+                        player.y = tileBottom;
                         player.dy = 0;
-                    }
-                    // Gauche
-                    else if (player.x + player.width > tileX && player.x < tileX && player.dy >= 0) {
-                        player.x = tileX - player.width;
-                    }
-                    // Droite
-                    else if (player.x < tileX + TILE_SIZE && player.x + player.width > tileX + TILE_SIZE && player.dy >= 0) {
-                        player.x = tileX + TILE_SIZE;
                     }
                 } else if (tile === 2) {
                     playerDie();
@@ -246,12 +218,11 @@ function update() {
         if (keys['ArrowRight']) cameraX += player.speed;
         if (keys['ArrowLeft'] && cameraX > 0) cameraX -= player.speed;
 
-        if (jumpPressed && coyoteTime > 0) {
+        if (keys['ArrowUp'] && coyoteTime > 0) {
             player.dy = -player.jumpPower;
             player.onGround = false;
             jumpSound.play();
             coyoteTime = 0;
-            jumpPressed = false;
         }
 
         player.dy += GRAVITY;
@@ -263,11 +234,6 @@ function update() {
         generateNextSectionIfNeeded();
 
         score = Math.floor((cameraX + totalOffset) / 10);
-    }
-
-    if (gameState === 'gameover' && screamerActive) {
-        screamerTimer--;
-        if (screamerTimer <= 0) screamerActive = false;
     }
 
     draw();
@@ -287,6 +253,7 @@ function draw() {
         ctx.textAlign = 'center';
         ctx.fillText('Tralalero Tralarun', canvas.width / 2, 100);
 
+        // Bouton Play
         ctx.fillStyle = '#FFEB3B';
         ctx.fillRect(playButton.x, playButton.y, playButton.width, playButton.height);
         ctx.strokeStyle = 'black';
@@ -316,10 +283,13 @@ function draw() {
     ctx.textAlign = 'left';
     ctx.fillText('Score: ' + score, 10, 30);
 
+    // Bloc 'gameover'
     if (gameState === 'gameover') {
         if (screamerActive && screamerImg.complete) {
+            // Affiche l'image en plein écran
             ctx.drawImage(screamerImg, 0, 0, canvas.width, canvas.height);
         } else {
+            // Texte classique si pas de screamer
             ctx.fillStyle = 'red';
             ctx.font = '40px "Press Start 2P", monospace';
             ctx.textAlign = 'center';
@@ -350,5 +320,10 @@ function drawLevel() {
 
 // --- Démarrage du jeu ---
 function startGame() {
+    // Démarre la musique après une interaction utilisateur
+    document.addEventListener('keydown', () => {
+        if (bgMusic.paused) bgMusic.play();
+    }, { once: true });
+
     update(); // Lance la boucle
 }
