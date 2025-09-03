@@ -16,7 +16,7 @@ obstacleImg.src = 'images/obstacle.png';
 const solImg = new Image();
 solImg.src = 'images/sol.png';
 const screamerImg = new Image();
-screamerImg.src = 'smiledogs.jpg';
+screamerImg.src = 'images/smiledogs.jpg';
 
 // --- Audio ---
 const bgMusic = new Audio('audio/background.mp3');
